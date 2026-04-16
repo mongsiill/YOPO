@@ -2,6 +2,7 @@
 
 ZED_IMAGE="ghcr.io/mongsiill/zed_ros2_desktop_u22.04_sdk_5.2.0_cuda_12.6.3:latest"
 BBOX_IMAGE="ghcr.io/mongsiill/edgetam-bbox:humble"
+PICKER_IMAGE="ghcr.io/mongsiill/tomato-picker:humble"
 ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 DISPLAY_ENV="${DISPLAY:-:0}"
 
@@ -17,7 +18,7 @@ if command -v xhost &> /dev/null; then
 fi
 
 # 이미지 없으면 pull
-for IMAGE in $ZED_IMAGE $BBOX_IMAGE; do
+for IMAGE in $ZED_IMAGE $BBOX_IMAGE $PICKER_IMAGE; do
     if ! docker image inspect $IMAGE > /dev/null 2>&1; then
         echo "$IMAGE 다운로드 중..."
         docker pull $IMAGE
@@ -27,58 +28,32 @@ done
 # 기존 세션 삭제
 tmux kill-session -t pipeline 2>/dev/null
 
-# tmux 세션 시작
-tmux new-session -d -s pipeline -x 220 -y 50
+# docker 명령은 한 줄 (아래는 tmux에 직접 exec — send-keys 로 타이핑하지 않음)
+# 레이아웃: 0.0 좌상 ZED | 0.1 우상 Picker
+#           0.3 좌하 BBox ffs | 0.2 우하 Rerun
+# attach 시 포커스는 0.0 (ZED)
 
-# 터미널 1 - ZED 카메라
-tmux send-keys -t pipeline "docker run --runtime nvidia -it --privileged \
-    --network=host --ipc=host --pid=host \
-    -e NVIDIA_DRIVER_CAPABILITIES=all \
-    -e DISPLAY=$DISPLAY_ENV \
-    -v /tmp/.X11-unix/:/tmp/.X11-unix \
-    -v /dev:/dev \
-    -v /dev/shm:/dev/shm \
-    -v /usr/local/zed/resources/:/usr/local/zed/resources/ \
-    -v /usr/local/zed/settings/:/usr/local/zed/settings/ \
-    $ZED_IMAGE \
-    /bin/bash -c 'source /opt/ros/humble/setup.bash && \
-    ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2i'" Enter
+CMD_ZED="docker run --runtime nvidia -it --privileged --network=host --ipc=host --pid=host -e NVIDIA_DRIVER_CAPABILITIES=all -e DISPLAY=${DISPLAY_ENV} -v /tmp/.X11-unix/:/tmp/.X11-unix -v /dev:/dev -v /dev/shm:/dev/shm -v /usr/local/zed/resources/:/usr/local/zed/resources/ -v /usr/local/zed/settings/:/usr/local/zed/settings/ ${ZED_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && exec ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2i'"
 
-# ZED 완전히 뜰 때까지 대기
+CMD_PICKER="docker run -it --rm --network=host -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -e NO_AT_BRIDGE=1 -v /tmp/.X11-unix/:/tmp/.X11-unix ${PICKER_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/user/projects/Tomato_Picker/install/setup.bash && exec ros2 run tomato_picker annotation_box2d_publisher'"
+
+CMD_RERUN="docker run --gpus all -it --rm --network=host -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -v /tmp/.X11-unix/:/tmp/.X11-unix ${BBOX_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/user/projects/EdgeTAM_bbox/install/setup.bash && exec ros2 run bbox_maker rerun_bridge_node --ros-args -p world_frame:=map -p lock_to_world:=true -p log_camera_pose:=true -p camera_entity_path:=world/camera -p max_points:=0 -p rerun_spawn:=true'"
+
+CMD_FFS="docker run --gpus all -it --rm --network=host -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -v /tmp/.X11-unix/:/tmp/.X11-unix ${BBOX_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/user/projects/EdgeTAM_bbox/install/setup.bash && exec ros2 launch bbox_maker ffs_pipeline.launch.py'"
+
+# tmux: send-keys 대신 new-session / split-window 에 실행할 명령을 직접 넘김 (셸만 뜨고 docker 안 도는 현상 방지)
+tmux new-session -d -s pipeline -x 220 -y 50 bash -lc "$CMD_ZED"
+
 echo "ZED 카메라 시작 대기 중..."
-sleep 8
+sleep 7
 
-# 터미널 2 - Rerun Bridge (BBox 컨테이너 내부)
-tmux split-window -h -t pipeline
-tmux send-keys -t pipeline "docker run --gpus all -it --rm \
-    --network=host \
-    -e ROS_DOMAIN_ID=$ROS_DOMAIN_ID \
-    -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-    -e DISPLAY=$DISPLAY_ENV \
-    -v /tmp/.X11-unix/:/tmp/.X11-unix \
-    $BBOX_IMAGE \
-    /bin/bash -c 'source /opt/ros/humble/setup.bash && \
-    source /home/user/projects/EdgeTAM_bbox/install/setup.bash && \
-    ros2 run bbox_maker rerun_bridge_node --ros-args \
-    -p world_frame:=map \
-    -p lock_to_world:=true \
-    -p log_camera_pose:=true \
-    -p camera_entity_path:=world/camera \
-    -p max_points:=0 \
-    -p rerun_spawn:=true'" Enter
+tmux split-window -h -t pipeline:0.0 bash -lc "$CMD_PICKER"
+sleep 0.2
+tmux split-window -v -t pipeline:0.1 bash -lc "$CMD_RERUN"
+sleep 0.2
+tmux split-window -v -t pipeline:0.0 bash -lc "$CMD_FFS"
 
-# 터미널 3 - BBox Pipeline
-tmux split-window -v -t pipeline:0.1
-tmux send-keys -t pipeline:0.2 "docker run --gpus all -it --rm \
-    --network=host \
-    -e ROS_DOMAIN_ID=$ROS_DOMAIN_ID \
-    -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-    -e DISPLAY=$DISPLAY_ENV \
-    -v /tmp/.X11-unix/:/tmp/.X11-unix \
-    $BBOX_IMAGE \
-    /bin/bash -c 'source /opt/ros/humble/setup.bash && \
-    source /home/user/projects/EdgeTAM_bbox/install/setup.bash && \
-    ros2 launch bbox_maker ffs_pipeline.launch.py'" Enter
+tmux select-pane -t pipeline:0.0
 
 # tmux 세션 attach
 tmux attach-session -t pipeline
