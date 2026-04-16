@@ -46,7 +46,7 @@ tmux send-keys -t pipeline "docker run --runtime nvidia -it --privileged \
 
 # ZED 완전히 뜰 때까지 대기
 echo "ZED 카메라 시작 대기 중..."
-sleep 5
+sleep 8
 
 # 터미널 2 - Rerun Bridge (BBox 컨테이너 내부)
 tmux split-window -h -t pipeline
