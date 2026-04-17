@@ -33,7 +33,7 @@ tmux kill-session -t pipeline 2>/dev/null
 #           0.3 좌하 BBox ffs | 0.2 우하 Rerun
 # attach 시 포커스는 0.0 (ZED)
 
-CMD_ZED="docker run --runtime nvidia -it --privileged --network=host --ipc=host --pid=host -e NVIDIA_DRIVER_CAPABILITIES=all -e DISPLAY=${DISPLAY_ENV} -v /tmp/.X11-unix/:/tmp/.X11-unix -v /dev:/dev -v /dev/shm:/dev/shm -v /usr/local/zed/resources/:/usr/local/zed/resources/ -v /usr/local/zed/settings/:/usr/local/zed/settings/ ${ZED_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && exec ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2i'"
+CMD_ZED="docker run --runtime nvidia -it --privileged --network=host --ipc=host --pid=host -e NVIDIA_DRIVER_CAPABILITIES=all -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -v /tmp/.X11-unix/:/tmp/.X11-unix -v /dev:/dev -v /dev/shm:/dev/shm -v /usr/local/zed/resources/:/usr/local/zed/resources/ -v /usr/local/zed/settings/:/usr/local/zed/settings/ ${ZED_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && exec ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2i'"
 
 CMD_PICKER="docker run -it --rm --network=host -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -e NO_AT_BRIDGE=1 -v /tmp/.X11-unix/:/tmp/.X11-unix ${PICKER_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/user/projects/Tomato_Picker/install/setup.bash && exec ros2 run tomato_picker annotation_box2d_publisher'"
 
