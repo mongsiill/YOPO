@@ -47,12 +47,12 @@ CMD_FFS="docker run --gpus all -it --rm --network=host -e ROS_DOMAIN_ID=${ROS_DO
 tmux new-session -d -s pipeline -x 220 -y 50 bash -lc "$CMD_ZED"
 
 echo "ZED 카메라 시작 대기 중..."
-sleep 5
+sleep 10
 
 tmux split-window -h -t pipeline:0.0 bash -lc "$CMD_PICKER"
-sleep 0.2
+sleep 3
 tmux split-window -v -t pipeline:0.1 bash -lc "$CMD_RERUN"
-sleep 0.2
+sleep 3
 tmux split-window -v -t pipeline:0.0 bash -lc "$CMD_FFS"
 
 tmux select-pane -t pipeline:0.0
