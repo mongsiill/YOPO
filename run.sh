@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export CYCLONEDDS_URI='<CycloneDDS><Domain><General><Interfaces><NetworkInterface name="lo"/></Interfaces></General></Domain></CycloneDDS>'
+
 ZED_IMAGE="ghcr.io/mongsiill/zed_ros2_desktop_u22.04_sdk_5.2.0_cuda_12.6.3:latest"
 BBOX_IMAGE="ghcr.io/mongsiill/edgetam-bbox:humble"
 PICKER_IMAGE="ghcr.io/mongsiill/tomato-picker:humble"
