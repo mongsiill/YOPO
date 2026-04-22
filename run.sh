@@ -37,7 +37,7 @@ tmux kill-session -t pipeline 2>/dev/null
 
 CMD_ZED="docker run --runtime nvidia -it --privileged --network=host --ipc=host --pid=host -e NVIDIA_DRIVER_CAPABILITIES=all -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -v /tmp/.X11-unix/:/tmp/.X11-unix -v /dev:/dev -v /dev/shm:/dev/shm -v /usr/local/zed/resources/:/usr/local/zed/resources/ -v /usr/local/zed/settings/:/usr/local/zed/settings/ ${ZED_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && exec ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2i'"
 
-CMD_PICKER="docker run -it --rm --network=host -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -e NO_AT_BRIDGE=1 -v /tmp/.X11-unix/:/tmp/.X11-unix ${PICKER_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/user/projects/Tomato_Picker/install/setup.bash && exec ros2 run tomato_picker annotation_box2d_publisher'"
+CMD_PICKER="docker run -it --rm --gpus all --network=host -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -e NO_AT_BRIDGE=1 -v /tmp/.X11-unix/:/tmp/.X11-unix ${PICKER_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/user/projects/Tomato_Picker/install/setup.bash && exec ros2 run tomato_picker vlm_tomato_node'"
 
 CMD_RERUN="docker run --gpus all -it --rm --network=host -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -v /tmp/.X11-unix/:/tmp/.X11-unix ${BBOX_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/user/projects/EdgeTAM_bbox/install/setup.bash && exec ros2 run bbox_maker rerun_bridge_node --ros-args -p world_frame:=map -p lock_to_world:=true -p log_camera_pose:=true -p camera_entity_path:=world/camera -p max_points:=0 -p rerun_spawn:=true'"
 
@@ -50,7 +50,7 @@ echo "ZED 카메라 시작 대기 중..."
 sleep 10
 
 tmux split-window -h -t pipeline:0.0 bash -lc "$CMD_PICKER"
-sleep 3
+sleep 10
 tmux split-window -v -t pipeline:0.1 bash -lc "$CMD_RERUN"
 sleep 3
 tmux split-window -v -t pipeline:0.0 bash -lc "$CMD_FFS"
