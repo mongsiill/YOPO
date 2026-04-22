@@ -35,13 +35,53 @@ tmux kill-session -t pipeline 2>/dev/null
 #           0.3 좌하 BBox ffs | 0.2 우하 Rerun
 # attach 시 포커스는 0.0 (ZED)
 
-CMD_ZED="docker run --runtime nvidia -it --privileged --network=host --ipc=host --pid=host -e NVIDIA_DRIVER_CAPABILITIES=all -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -v /tmp/.X11-unix/:/tmp/.X11-unix -v /dev:/dev -v /dev/shm:/dev/shm -v /usr/local/zed/resources/:/usr/local/zed/resources/ -v /usr/local/zed/settings/:/usr/local/zed/settings/ ${ZED_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && exec ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2i'"
+CMD_ZED="docker run --runtime nvidia -it --privileged --network=host --ipc=host --pid=host \
+  -e NVIDIA_DRIVER_CAPABILITIES=all \
+  -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} \
+  -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+  -e DISPLAY=${DISPLAY_ENV} \
+  -v /tmp/.X11-unix/:/tmp/.X11-unix \
+  -v /dev:/dev \
+  -v /dev/shm:/dev/shm \
+  -v /usr/local/zed/resources/:/usr/local/zed/resources/ \
+  -v /usr/local/zed/settings/:/usr/local/zed/settings/ \
+  ${ZED_IMAGE} /bin/bash -lc \
+  'source /opt/ros/humble/setup.bash && exec ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2i'"
 
-CMD_PICKER="docker run -it --rm --gpus all --network=host -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -e NO_AT_BRIDGE=1 -v /tmp/.X11-unix/:/tmp/.X11-unix ${PICKER_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/user/projects/Tomato_Picker/install/setup.bash && exec ros2 run tomato_picker vlm_tomato_node'"
+CMD_PICKER="docker run -it --rm --gpus all --network=host \
+  -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} \
+  -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+  -e DISPLAY=${DISPLAY_ENV} \
+  -e NO_AT_BRIDGE=1 \
+  -e YOLO_CONFIG_DIR=/root/.config/Ultralytics \
+  -v /tmp/.X11-unix/:/tmp/.X11-unix \
+  -v /root/.config/Ultralytics:/root/.config/Ultralytics \
+  ${PICKER_IMAGE} /bin/bash -lc \
+  'source /opt/ros/humble/setup.bash && source /home/user/projects/Tomato_Picker/install/setup.bash && exec ros2 run tomato_picker vlm_tomato_node'"
 
-CMD_RERUN="docker run --gpus all -it --rm --network=host -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -v /tmp/.X11-unix/:/tmp/.X11-unix ${BBOX_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/user/projects/EdgeTAM_bbox/install/setup.bash && exec ros2 run bbox_maker rerun_bridge_node --ros-args -p world_frame:=map -p lock_to_world:=true -p log_camera_pose:=true -p camera_entity_path:=world/camera -p max_points:=0 -p rerun_spawn:=true'"
-
-CMD_FFS="docker run --gpus all -it --rm --network=host -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e DISPLAY=${DISPLAY_ENV} -v /tmp/.X11-unix/:/tmp/.X11-unix ${BBOX_IMAGE} /bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/user/projects/EdgeTAM_bbox/install/setup.bash && exec ros2 launch bbox_maker ffs_pipeline.launch.py'"
+CMD_RERUN="docker run --gpus all -it --rm --network=host \
+  -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} \
+  -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+  -e DISPLAY=${DISPLAY_ENV} \
+  -v /tmp/.X11-unix/:/tmp/.X11-unix \
+  ${BBOX_IMAGE} /bin/bash -lc \
+  'source /opt/ros/humble/setup.bash && source /home/user/projects/EdgeTAM_bbox/install/setup.bash && exec ros2 run bbox_maker rerun_bridge_node --ros-args \
+    -p world_frame:=map \
+    -p lock_to_world:=true \
+    -p log_camera_pose:=true \
+    -p camera_entity_path:=world/camera \
+    -p max_points:=0 \
+    -p rerun_spawn:=true'"
+    
+CMD_FFS="docker run --gpus all -it --rm --network=host \
+  -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} \
+  -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+  -e DISPLAY=${DISPLAY_ENV} \
+  -e YOLO_CONFIG_DIR=/home/user/.config/Ultralytics \
+  -v /tmp/.X11-unix/:/tmp/.X11-unix \
+  -v /home/user/.config/Ultralytics:/home/user/.config/Ultralytics \
+  ${BBOX_IMAGE} /bin/bash -lc \
+  'source /opt/ros/humble/setup.bash && source /home/user/projects/EdgeTAM_bbox/install/setup.bash && exec ros2 launch bbox_maker ffs_pipeline.launch.py'"
 
 # tmux: send-keys 대신 new-session / split-window 에 실행할 명령을 직접 넘김 (셸만 뜨고 docker 안 도는 현상 방지)
 tmux new-session -d -s pipeline -x 220 -y 50 bash -lc "$CMD_ZED"
