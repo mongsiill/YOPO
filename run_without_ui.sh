@@ -12,6 +12,7 @@ export ROS_DOMAIN_ID
 RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
 export RMW_IMPLEMENTATION
 DISPLAY_ENV="${DISPLAY:-:0}"
+HF_CACHE_HOST="${HF_CACHE_HOST:-$HOME/.cache/huggingface}"
 
 # tmux 설치 확인
 if ! command -v tmux &> /dev/null; then
@@ -69,8 +70,10 @@ CMD_FFS="docker run --gpus all -it --rm --network=host \
   -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
   -e DISPLAY=${DISPLAY_ENV} \
   -e YOLO_CONFIG_DIR=/home/user/.config/Ultralytics \
+  -e HF_HOME=/root/.cache/huggingface \
   -v /tmp/.X11-unix/:/tmp/.X11-unix \
   -v /home/user/.config/Ultralytics:/home/user/.config/Ultralytics \
+  -v ${HF_CACHE_HOST}:/root/.cache/huggingface \
   ${BBOX_IMAGE} /bin/bash -lc \
   'source /opt/ros/humble/setup.bash && source /home/user/projects/YOPO_3DMaker/install/setup.bash && exec ros2 launch bbox_maker ffs_pipeline.launch.py'"
 
