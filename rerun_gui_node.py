@@ -19,6 +19,7 @@ from rclpy.qos import (
 from rclpy.time import Time
 from sensor_msgs.msg import CompressedImage, Image, PointCloud2
 from sensor_msgs_py import point_cloud2
+from std_msgs.msg import String
 from visualization_msgs.msg import Marker, MarkerArray
 
 try:
@@ -140,6 +141,8 @@ class RerunGuiNode(Node):
         self.declare_parameter("depth_map_topic", "")
         self.declare_parameter("pointcloud_topic", "")
         self.declare_parameter("tomato_bbox3d_topic", "")
+        self.declare_parameter("vlm_annotated_topic", "")
+        self.declare_parameter("reasoning_topic", "")
         self.declare_parameter("world_frame", "map")
         self.declare_parameter("lock_to_world", False)
         self.declare_parameter("log_tomato_camera_from_tf", True)
@@ -166,6 +169,8 @@ class RerunGuiNode(Node):
         depth_map_topic = self.get_parameter("depth_map_topic").get_parameter_value().string_value
         pointcloud_topic = self.get_parameter("pointcloud_topic").get_parameter_value().string_value
         tomato_bbox3d_topic = self.get_parameter("tomato_bbox3d_topic").get_parameter_value().string_value
+        vlm_annotated_topic = self.get_parameter("vlm_annotated_topic").get_parameter_value().string_value
+        reasoning_topic = self.get_parameter("reasoning_topic").get_parameter_value().string_value
 
         if tomato_defaults:
             if not mask_overlay_topic:
@@ -178,6 +183,10 @@ class RerunGuiNode(Node):
                 pointcloud_topic = "/tomato/pointcloud"
             if not tomato_bbox3d_topic:
                 tomato_bbox3d_topic = "/tomato/box3d"
+            if not vlm_annotated_topic:
+                vlm_annotated_topic = "/tomato/vlm/annotated"
+            if not reasoning_topic:
+                reasoning_topic = "/tomato/vlm/reasoning"
 
         self._world_frame = self.get_parameter("world_frame").get_parameter_value().string_value
         self._lock_to_world = self.get_parameter("lock_to_world").get_parameter_value().bool_value
@@ -259,6 +268,12 @@ class RerunGuiNode(Node):
         if tomato_bbox3d_topic:
             self.create_subscription(Marker, tomato_bbox3d_topic, self._on_tomato_bbox3d, 10)
             self.get_logger().info(f"tomato bbox3d (Marker) 구독: {tomato_bbox3d_topic}")
+        if vlm_annotated_topic:
+            self.create_subscription(Image, vlm_annotated_topic, self._on_vlm_annotated, image_qos)
+            self.get_logger().info(f"vlm annotated 구독: {vlm_annotated_topic}")
+        if reasoning_topic:
+            self.create_subscription(String, reasoning_topic, self._on_reasoning, 10)
+            self.get_logger().info(f"reasoning(String) 구독: {reasoning_topic}")
 
     def _apply_tomato_blueprint(self) -> None:
         try:
@@ -266,10 +281,17 @@ class RerunGuiNode(Node):
                 rrb.Horizontal(
                     rrb.Spatial3DView(origin="/", name="3D View"),
                     rrb.Vertical(
+                        rrb.Vertical(
+                            rrb.Spatial2DView(origin="tomato/vlm/annotated", name="VLM Annotated"),
+                            rrb.TextLogView(origin="tomato/vlm/reasoning", name="VLM Reasoning Log"),
+                            row_shares=[0.85, 0.15],
+                        ),
                         rrb.Spatial2DView(origin="tomato/box2d_overlay", name="Box2D overlay (detector)"),
                         rrb.Spatial2DView(origin="tomato/mask_overlay", name="Mask overlay (filtered)"),
                         rrb.Spatial2DView(origin="tomato/depth_vis", name="Depth Map"),
+                        row_shares=[0.42, 0.19, 0.19, 0.20],
                     ),
+                    column_shares=[0.58, 0.42],
                 ),
                 collapse_panels=True,
             )
@@ -394,6 +416,21 @@ class RerunGuiNode(Node):
             self._tomato_bgr_to_rgb_log(msg, "tomato/depth_vis", True)
         except Exception as e:  # noqa: BLE001
             self.get_logger().error(f"depth_vis 로깅 실패: {e}")
+
+    def _on_vlm_annotated(self, msg: Image) -> None:
+        try:
+            self._tomato_bgr_to_rgb_log(msg, "tomato/vlm/annotated", True)
+        except Exception as e:  # noqa: BLE001
+            self.get_logger().error(f"vlm annotated 로깅 실패: {e}")
+
+    def _on_reasoning(self, msg: String) -> None:
+        try:
+            text = (msg.data or "").strip()
+            if not text:
+                return
+            rr.log("tomato/vlm/reasoning", rr.TextLog(text))
+        except Exception as e:  # noqa: BLE001
+            self.get_logger().error(f"reasoning 로깅 실패: {e}")
 
     def _on_pointcloud(self, msg: PointCloud2) -> None:
         try:
