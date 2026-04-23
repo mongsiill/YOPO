@@ -5,8 +5,8 @@ export CYCLONEDDS_URI='<CycloneDDS><Domain><General><Interfaces><NetworkInterfac
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ZED_IMAGE="ghcr.io/mongsiill/zed_ros2_desktop_u22.04_sdk_5.2.0_cuda_12.6.3:latest"
-BBOX_IMAGE="ghcr.io/mongsiill/edgetam-bbox:humble"
-PICKER_IMAGE="ghcr.io/mongsiill/tomato-picker:humble"
+BBOX_IMAGE="ghcr.io/mongsiill/yopo_3dmaker:humble"
+PICKER_IMAGE="ghcr.io/mongsiill/yopo_picker:humble"
 ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 export ROS_DOMAIN_ID
 RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
@@ -37,7 +37,7 @@ tmux kill-session -t pipeline 2>/dev/null
 
 # docker 명령은 한 줄 (아래는 tmux에 직접 exec — send-keys 로 타이핑하지 않음)
 # 레이아웃: 0.0 좌상 ZED | 0.1 우상 Picker
-#           0.3 좌하 BBox ffs | 0.2 우하 Rerun
+#           0.2 좌하 BBox ffs
 # attach 시 포커스는 0.0 (ZED)
 
 CMD_ZED="docker run --runtime nvidia -it --privileged --network=host --ipc=host --pid=host \
@@ -62,15 +62,7 @@ CMD_PICKER="docker run -it --rm --gpus all --network=host \
   -v /tmp/.X11-unix/:/tmp/.X11-unix \
   -v /root/.config/Ultralytics:/root/.config/Ultralytics \
   ${PICKER_IMAGE} /bin/bash -lc \
-  'source /opt/ros/humble/setup.bash && source /home/user/projects/Tomato_Picker/install/setup.bash && exec ros2 run tomato_picker vlm_tomato_node'"
-
-# Rerun: 호스트에서 ROS 토픽 구독 (컨테이너와 동일 호스트 네트워크의 DDS)
-# pip install --user -r "${SCRIPT_DIR}/requirements-rerun.txt"
-CMD_RERUN="source /opt/ros/humble/setup.bash && exec python3 ${SCRIPT_DIR}/rerun_gui.py --ros-args \
-  -p rerun_spawn:=true \
-  -p camera_entity_path:=world/camera \
-  -p image_topic:=/zed/zed_node/rgb/image_rect_color \
-  -p max_fps:=20.0"
+  'source /opt/ros/humble/setup.bash && source /home/user/projects/YOPO_Picker/install/setup.bash && exec ros2 run tomato_picker vlm_tomato_node'"
 
 CMD_FFS="docker run --gpus all -it --rm --network=host \
   -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID} \
@@ -80,18 +72,15 @@ CMD_FFS="docker run --gpus all -it --rm --network=host \
   -v /tmp/.X11-unix/:/tmp/.X11-unix \
   -v /home/user/.config/Ultralytics:/home/user/.config/Ultralytics \
   ${BBOX_IMAGE} /bin/bash -lc \
-  'source /opt/ros/humble/setup.bash && source /home/user/projects/EdgeTAM_bbox/install/setup.bash && exec ros2 launch bbox_maker ffs_pipeline.launch.py'"
+  'source /opt/ros/humble/setup.bash && source /home/user/projects/YOPO_3DMaker/install/setup.bash && exec ros2 launch bbox_maker ffs_pipeline.launch.py'"
 
 # tmux: send-keys 대신 new-session / split-window 에 실행할 명령을 직접 넘김 (셸만 뜨고 docker 안 도는 현상 방지)
 tmux new-session -d -s pipeline -x 220 -y 50 bash -lc "$CMD_ZED"
-
-echo "ZED 카메라 시작 대기 중..."
-sleep 10
+sleep 8
 
 tmux split-window -h -t pipeline:0.0 bash -lc "$CMD_PICKER"
-sleep 10
-tmux split-window -v -t pipeline:0.1 bash -lc "$CMD_RERUN"
-sleep 3
+sleep 0.5
+
 tmux split-window -v -t pipeline:0.0 bash -lc "$CMD_FFS"
 
 tmux select-pane -t pipeline:0.0
