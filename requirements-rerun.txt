@@ -1,0 +1,4 @@
+# 호스트: pip install --user -r requirements-rerun.txt
+# numpy<2 : /opt/ros/humble 의 cv_bridge 가 NumPy 1.x ABI 로 빌드되어 있음 (NumPy 2 병행 시 깨짐)
+rerun-sdk>=0.15.0
+numpy>=1.21.0,<2
